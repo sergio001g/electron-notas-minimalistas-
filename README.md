@@ -40,3 +40,5 @@ Los archivos se guardan en:
 ```
 Documentos/MinimalNotePad
 ```
+<img width="1600" height="852" alt="image" src="https://github.com/user-attachments/assets/18d89494-5ef8-4637-95ad-1b40c2bd65a7" />
+
