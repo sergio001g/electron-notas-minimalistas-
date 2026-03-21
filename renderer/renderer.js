@@ -21,8 +21,11 @@ const sidePanel = document.getElementById("sidePanel");
 const sessionTimeEl = document.getElementById("sessionTime");
 const clockTimeEl = document.getElementById("clockTime");
 const wordCountEl = document.getElementById("wordCount");
+const charCountEl = document.getElementById("charCount");
 const musicStatusEl = document.querySelector(".music-status");
 const musicTitleEl = document.querySelector(".music-title");
+const notesListEl = document.getElementById("notesList");
+const refreshNotesBtn = document.getElementById("refreshNotesBtn");
 
 // State
 let autosaveTimer = null;
@@ -31,6 +34,15 @@ let audioContext = null;
 let lastClickAt = 0;
 let soundEnabled = true;
 let sessionSeconds = 0;
+let isDirty = false;
+let allowDiskAutosave = false;
+let statusResetTimer = null;
+let draftTimer = null;
+
+const STORAGE_KEYS = {
+  prefs: "mn:prefs",
+  draft: "mn:draft"
+};
 
 // --- UTILS ---
 
@@ -47,7 +59,34 @@ const formatTimestamp = () => {
   return now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 };
 
-const sanitizeName = (name) => name.trim();
+const sanitizeName = (name) => {
+  const trimmed = (name || "").trim();
+  return trimmed.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim();
+};
+
+const safeJsonParse = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const readPrefs = () => safeJsonParse(localStorage.getItem(STORAGE_KEYS.prefs) || "");
+
+const writePrefs = (prefs) => {
+  localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(prefs));
+};
+
+const getCurrentNameBase = () => {
+  const typed = sanitizeName(fileNameInput.value);
+  return typed || sanitizeName(lastOpenedName);
+};
+
+const scheduleStatusReset = () => {
+  if (statusResetTimer) clearTimeout(statusResetTimer);
+  statusResetTimer = setTimeout(() => setStatus("Listo"), 1200);
+};
 
 const buildAutoName = () => {
   const now = new Date();
@@ -138,6 +177,7 @@ const updateStats = () => {
   
   // Update dashboard
   if (wordCountEl) wordCountEl.textContent = words;
+  if (charCountEl) charCountEl.textContent = chars;
 };
 
 const updateClock = () => {
@@ -173,6 +213,98 @@ const updateMusicStatus = () => {
   }
 };
 
+const formatShortDateTime = (ms) => {
+  const d = new Date(ms);
+  return d.toLocaleString("es-ES", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+};
+
+const renderNotesList = (notes) => {
+  if (!notesListEl) return;
+  notesListEl.innerHTML = "";
+  if (!notes || notes.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "meta-text";
+    empty.textContent = "Sin notas aún";
+    notesListEl.appendChild(empty);
+    return;
+  }
+
+  for (const note of notes.slice(0, 12)) {
+    const item = document.createElement("div");
+    item.className = "note-item";
+    item.tabIndex = 0;
+
+    const name = document.createElement("div");
+    name.className = "note-name";
+    name.textContent = note.fileName.replace(/\.txt$/i, "");
+
+    const meta = document.createElement("div");
+    meta.className = "note-meta";
+    meta.textContent = formatShortDateTime(note.modifiedAt);
+
+    item.appendChild(name);
+    item.appendChild(meta);
+
+    const open = async () => {
+      const result = await window.notesApi.openNoteByName(note.fileName);
+      if (!result.ok) {
+        setStatus("No se pudo abrir");
+        scheduleStatusReset();
+        return;
+      }
+      fileNameInput.value = result.fileName.replace(/\.txt$/, "");
+      lastOpenedName = result.fileName.replace(/\.txt$/, "");
+      editor.innerHTML = result.content || "";
+      isDirty = false;
+      allowDiskAutosave = true;
+      setStatus("Abierto");
+      setLastSaved(`Abierto ${formatTimestamp()}`);
+      localStorage.removeItem(STORAGE_KEYS.draft);
+      updateStats();
+      scheduleStatusReset();
+    };
+
+    item.addEventListener("click", open);
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+
+    notesListEl.appendChild(item);
+  }
+};
+
+const refreshNotesList = async () => {
+  if (!window.notesApi?.listNotes) return;
+  const result = await window.notesApi.listNotes();
+  if (!result?.ok) return;
+  renderNotesList(result.notes);
+};
+
+const scheduleDraftSave = () => {
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const html = editor.innerHTML || "";
+    const name = getCurrentNameBase();
+    const empty = !html || html === "<br>" || html === "<div><br></div>";
+    if (empty && !name) {
+      localStorage.removeItem(STORAGE_KEYS.draft);
+      return;
+    }
+    localStorage.setItem(
+      STORAGE_KEYS.draft,
+      JSON.stringify({ name, html, ts: Date.now() })
+    );
+  }, 350);
+};
+
 // --- CORE ---
 
 const saveNote = async (nameOverride) => {
@@ -185,9 +317,14 @@ const saveNote = async (nameOverride) => {
     lastOpenedName = result.fileName.replace(/\.txt$/, "");
     setStatus(`Guardado`);
     setLastSaved(`Guardado ${formatTimestamp()}`);
+    isDirty = false;
+    allowDiskAutosave = true;
+    localStorage.removeItem(STORAGE_KEYS.draft);
+    refreshNotesList();
   } else {
     setStatus("Error al guardar");
   }
+  scheduleStatusReset();
 };
 
 // --- LISTENERS ---
@@ -205,7 +342,12 @@ openBtn.addEventListener("click", async () => {
   editor.innerHTML = result.content || "";
   setStatus(`Abierto`);
   setLastSaved(`Abierto ${formatTimestamp()}`);
+  isDirty = false;
+  allowDiskAutosave = true;
+  localStorage.removeItem(STORAGE_KEYS.draft);
   updateStats();
+  refreshNotesList();
+  scheduleStatusReset();
 });
 
 newBtn.addEventListener("click", () => {
@@ -214,7 +356,11 @@ newBtn.addEventListener("click", () => {
   lastOpenedName = "";
   setStatus("Nueva nota");
   setLastSaved("Sin guardar");
+  isDirty = false;
+  allowDiskAutosave = false;
+  localStorage.removeItem(STORAGE_KEYS.draft);
   updateStats();
+  scheduleStatusReset();
 });
 
 boldBtn.addEventListener("click", () => {
@@ -242,17 +388,33 @@ zenBtn.addEventListener("click", () => {
 
 sidePanelBtn.addEventListener("click", () => {
   sidePanel.classList.toggle("hidden");
+  const prefs = readPrefs() || {};
+  writePrefs({ ...prefs, sidePanelHidden: sidePanel.classList.contains("hidden") });
 });
 
 soundToggle.addEventListener("click", () => {
   soundEnabled = !soundEnabled;
   soundToggle.textContent = soundEnabled ? "🔊 ON" : "🔇 OFF";
   soundToggle.style.opacity = soundEnabled ? "1" : "0.5";
+  const prefs = readPrefs() || {};
+  writePrefs({ ...prefs, soundEnabled });
 });
 
 editor.addEventListener("input", () => {
   setStatus("Escribiendo...");
+  scheduleStatusReset();
   updateStats();
+  isDirty = true;
+  setLastSaved("Sin guardar");
+  scheduleDraftSave();
+
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  if (allowDiskAutosave) {
+    autosaveTimer = setTimeout(() => {
+      if (!isDirty) return;
+      saveNote();
+    }, 2000);
+  }
 });
 
 editor.addEventListener("keydown", (event) => {
@@ -265,32 +427,32 @@ editor.addEventListener("keydown", (event) => {
 
 // Shortcuts
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    if (document.body.classList.contains("zen-active")) {
+      document.body.classList.remove("zen-active");
+      setStatus("Zen desactivado");
+      scheduleStatusReset();
+    }
+    return;
+  }
+
   const isCommand = event.ctrlKey || event.metaKey;
   if (!isCommand) return;
   
   switch(event.key.toLowerCase()) {
     case "s":
       event.preventDefault();
-      saveNote();
+      if (event.shiftKey) {
+        const current = getCurrentNameBase();
+        const next = sanitizeName(window.prompt("Guardar como", current || "nota") || "");
+        if (next) saveNote(next);
+      } else {
+        saveNote();
+      }
       break;
     case "o":
       event.preventDefault();
       openBtn.click();
-      break;
-    case "b":
-      // Sidebar uses Ctrl+B by default in this logic if not handled carefully
-      // But standard Bold is Ctrl+B. Let's remap Sidebar to Ctrl+Shift+S or something
-      // Actually, execCommand('bold') handles Ctrl+B automatically for contenteditable.
-      // So we don't need to intercept 'b' unless we want the button visual feedback or specific logic.
-      // Let's toggle sidebar with something else or let the user click.
-      // Wait, I mapped Sidebar to 'b' in previous step. Let's fix that.
-      if (!event.shiftKey) {
-        // Allow native Bold behavior
-      } else {
-        // Ctrl+Shift+B -> Toggle Sidebar? Or just use a different key.
-        event.preventDefault();
-        sidePanelBtn.click();
-      }
       break;
     case "p":
       event.preventDefault();
@@ -305,10 +467,10 @@ document.addEventListener("keydown", (event) => {
       event.preventDefault();
       sidePanelBtn.click();
       break;
-    case "z": // Toggle Zen (Ctrl+Alt+Z or Ctrl+Shift+Z to avoid Undo conflict)
-      if (event.altKey || event.shiftKey) {
-          event.preventDefault();
-          zenBtn.click();
+    case "z": // Toggle Zen (Ctrl+Shift+Z to avoid Undo conflict)
+      if (event.shiftKey) {
+        event.preventDefault();
+        zenBtn.click();
       }
       break;
   }
@@ -321,3 +483,47 @@ setInterval(updateMusicStatus, 5000);
 updateClock();
 updateStats();
 setStatus("Listo");
+
+const prefs = readPrefs() || {};
+if (typeof prefs.soundEnabled === "boolean") {
+  soundEnabled = prefs.soundEnabled;
+}
+soundToggle.textContent = soundEnabled ? "🔊 ON" : "🔇 OFF";
+soundToggle.style.opacity = soundEnabled ? "1" : "0.5";
+
+if (typeof prefs.sidePanelHidden === "boolean") {
+  if (prefs.sidePanelHidden) {
+    sidePanel.classList.add("hidden");
+  } else {
+    sidePanel.classList.remove("hidden");
+  }
+}
+
+const draft = safeJsonParse(localStorage.getItem(STORAGE_KEYS.draft) || "");
+if (draft?.html) {
+  editor.innerHTML = draft.html;
+  if (draft.name) {
+    fileNameInput.value = draft.name;
+    lastOpenedName = draft.name;
+  }
+  isDirty = true;
+  allowDiskAutosave = false;
+  setStatus("Borrador recuperado");
+  setLastSaved("Sin guardar");
+  updateStats();
+  scheduleStatusReset();
+}
+
+refreshNotesList();
+
+if (refreshNotesBtn) {
+  refreshNotesBtn.addEventListener("click", () => {
+    refreshNotesList();
+  });
+}
+
+window.addEventListener("beforeunload", (e) => {
+  if (!isDirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});

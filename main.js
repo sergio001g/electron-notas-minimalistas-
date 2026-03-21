@@ -20,6 +20,18 @@ const normalizeFileName = (name) => {
   return base.endsWith(".txt") ? base : `${base}.txt`;
 };
 
+const resolveNotesPath = (notesDir, fileName) => {
+  if (!fileName || fileName.includes("..")) {
+    return null;
+  }
+  const resolved = path.resolve(notesDir, fileName);
+  const resolvedDir = path.resolve(notesDir) + path.sep;
+  if (!resolved.startsWith(resolvedDir)) {
+    return null;
+  }
+  return resolved;
+};
+
 app.disableHardwareAcceleration();
 
 const createWindow = () => {
@@ -97,5 +109,51 @@ ipcMain.handle("notes:open", async () => {
     return { ok: true, fileName: path.basename(filePath), content };
   } catch (error) {
     return { ok: false, message: "No se pudo abrir" };
+  }
+});
+
+ipcMain.handle("notes:openByName", async (_event, payload) => {
+  try {
+    const notesDir = ensureNotesDir();
+    const normalized = normalizeFileName(payload?.fileName);
+    if (!normalized) {
+      return { ok: false, message: "Nombre inválido" };
+    }
+    const filePath = resolveNotesPath(notesDir, normalized);
+    if (!filePath) {
+      return { ok: false, message: "Nombre inválido" };
+    }
+    const content = await fs.promises.readFile(filePath, "utf-8");
+    return { ok: true, fileName: normalized, content };
+  } catch (error) {
+    return { ok: false, message: "No se pudo abrir" };
+  }
+});
+
+ipcMain.handle("notes:list", async () => {
+  try {
+    const notesDir = ensureNotesDir();
+    const entries = await fs.promises.readdir(notesDir, { withFileTypes: true });
+    const files = entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".txt"))
+      .map((e) => e.name);
+
+    const stats = await Promise.all(
+      files.map(async (fileName) => {
+        const filePath = resolveNotesPath(notesDir, fileName);
+        if (!filePath) return null;
+        const stat = await fs.promises.stat(filePath);
+        return { fileName, modifiedAt: stat.mtimeMs };
+      })
+    );
+
+    const sorted = stats
+      .filter(Boolean)
+      .sort((a, b) => b.modifiedAt - a.modifiedAt)
+      .slice(0, 50);
+
+    return { ok: true, notes: sorted };
+  } catch (error) {
+    return { ok: false, message: "No se pudo listar" };
   }
 });
