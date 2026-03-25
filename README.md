@@ -1,4 +1,4 @@
-# Electron Notas Minimalistas
+# NOTEMA
 
 Aplicación de notas minimalista en Electron con enfoque en escritura, sonido de teclado agradable, panel lateral y modo Zen.
 
