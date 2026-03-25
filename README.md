@@ -89,6 +89,3 @@ Documentos/NOTEMA
 - localStorage para persistencia
 - SVG para conexiones y líneas
 
-## Licencia
-
-ISC
