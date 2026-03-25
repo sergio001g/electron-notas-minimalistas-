@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Minimal Note</title>
+    <title>NOTEMA</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app">
       <header class="topbar">
-        <div class="brand">minimal note</div>
+        <div class="brand">NOTEMA</div>
         <div class="actions">
           <button id="newBtn" class="button ghost" title="Nueva nota">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -40,6 +40,67 @@
           <button id="sidePanelBtn" class="button ghost" title="Panel Lateral">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
           </button>
+          <div class="separator"></div>
+          <button id="boardBtn" class="button ghost" title="Mapa / Ideas">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M10 7h4"/><path d="M6.5 10.5v3"/><path d="M17.5 10.5v3"/><path d="M10 17h4"/></svg>
+          </button>
+          <button id="addCardBtn" class="button ghost" title="Agregar cuadro">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M12 9v6"/><path d="M9 12h6"/></svg>
+          </button>
+          <button id="addStickyBtn" class="button ghost" title="Agregar post-it">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a2 2 0 0 1 2 2v10l-6 6H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M13 21v-4a2 2 0 0 1 2-2h4"/></svg>
+          </button>
+          <div class="menu">
+            <button id="menuBtn" class="button ghost" title="Menú" aria-haspopup="true" aria-expanded="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg>
+            </button>
+            <div id="menuDropdown" class="menu-dropdown hidden" aria-hidden="true">
+              <button id="menuAddCard" class="menu-item" type="button">Nuevo cuadro</button>
+              <button id="menuAddSticky" class="menu-item" type="button">Nuevo post-it</button>
+              <div class="menu-sep"></div>
+              <button id="menuConnect" class="menu-item" type="button">Conectar (C)</button>
+              <button id="menuDuplicate" class="menu-item" type="button">Duplicar (Ctrl+D)</button>
+              <button id="menuDelete" class="menu-item danger" type="button">Eliminar seleccionado</button>
+              <div class="menu-sep"></div>
+              <button id="menuCenter" class="menu-item" type="button">Centrar vista (Ctrl+0)</button>
+              <button id="menuGrid" class="menu-item" type="button">Cuadrícula</button>
+              <button id="menuRuler" class="menu-item" type="button">Regla</button>
+              <button id="menuRulerAngle" class="menu-item" type="button">Ángulos: 45°</button>
+              <div class="menu-sep"></div>
+              <div class="menu-label">Color cuadrícula</div>
+              <div class="menu-color-row" role="group" aria-label="Color cuadrícula">
+                <button class="color-btn grid-black" type="button" data-grid-color="black" title="Negro"></button>
+                <button class="color-btn grid-blue" type="button" data-grid-color="blue" title="Azul"></button>
+                <button class="color-btn grid-green" type="button" data-grid-color="green" title="Verde"></button>
+                <button class="color-btn grid-purple" type="button" data-grid-color="purple" title="Morado"></button>
+                <button class="color-btn grid-red" type="button" data-grid-color="red" title="Rojo"></button>
+              </div>
+              <div class="menu-sep"></div>
+              <div class="menu-label">Color post-it</div>
+              <div class="menu-color-row" role="group" aria-label="Color post-it">
+                <button class="color-btn yellow" type="button" data-sticky-color="yellow" title="Amarillo"></button>
+                <button class="color-btn pink" type="button" data-sticky-color="pink" title="Rosa"></button>
+                <button class="color-btn blue" type="button" data-sticky-color="blue" title="Azul"></button>
+                <button class="color-btn green" type="button" data-sticky-color="green" title="Verde"></button>
+                <button class="color-btn red" type="button" data-sticky-color="red" title="Rojo"></button>
+              </div>
+              <button id="menuPerf" class="menu-item" type="button">Modo rendimiento</button>
+              <div class="menu-sep"></div>
+              <button id="menuClearBoard" class="menu-item danger" type="button">Vaciar tablero</button>
+            </div>
+          </div>
+          <div class="separator"></div>
+          <div class="window-controls">
+            <button id="winMinBtn" class="window-btn" title="Minimizar" aria-label="Minimizar">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 9h8"/></svg>
+            </button>
+            <button id="winMaxBtn" class="window-btn" title="Maximizar" aria-label="Maximizar">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.2" y="2.2" width="7.6" height="7.6" rx="0.8"/></svg>
+            </button>
+            <button id="winCloseBtn" class="window-btn close" title="Cerrar" aria-label="Cerrar">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 3l6 6M9 3L3 9"/></svg>
+            </button>
+          </div>
         </div>
       </header>
       
@@ -55,6 +116,10 @@
           
           <main class="editor">
             <div id="editor" class="editor-area" contenteditable="true" data-placeholder="Escribe algo genial..."></div>
+            <div id="boardOverlay" class="board-overlay hidden" aria-hidden="true">
+              <svg id="boardEdges" class="board-edges" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+              <div id="boardNodes" class="board-nodes"></div>
+            </div>
           </main>
         </div>
 
